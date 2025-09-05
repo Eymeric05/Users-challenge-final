@@ -1,0 +1,185 @@
+doctype html
+html(lang="fr")
+head
+    meta(charset="UTF-8")
+    meta(name="viewport", content="width=device-width, initial-scale=1.0")
+    title Gestion des Étudiants - Liste
+    link(rel="stylesheet", href="/assets/css/style.css")
+body
+    .container
+        // Navigation
+        nav.nav
+            ul
+                li
+                    a(href="/") Home
+                li
+                    a.active(href="/users") Users
+
+        // Zone de toast
+        #toast-container.toast-container
+
+        // Liste des étudiants
+        .students-container
+            h1(style="text-align: center; margin-bottom: 30px; color: #333;") Liste des Étudiants
+            
+            if students && students.length > 0
+                each student in students
+                    .student-item
+                        .student-info
+                            .student-name= student.name
+                            .student-birth= student.formattedBirth
+                        .student-actions
+                            a.btn.btn-warning(href=`/edit/${student.id}`) Modifier
+                            form(style="display: inline;", action=`/delete/${student.id}`, method="POST", onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet étudiant ?')")
+                                button.btn.btn-danger(type="submit") ×
+            else
+                .empty-message
+                    p Aucun étudiant enregistré pour le moment.
+                    p 
+                        a.btn(href="/") Ajouter le premier étudiant
+
+    script.
+        // Gestionnaire de toasts amélioré
+        class ToastManager {
+            constructor() {
+                this.container = document.getElementById('toast-container');
+                this.toasts = [];
+            }
+
+            show(message, type = 'success', duration = 4000) {
+                const toast = this.createToast(message, type);
+                this.container.appendChild(toast);
+                this.toasts.push(toast);
+
+                requestAnimationFrame(() => {
+                    toast.style.transform = 'translateX(0) scale(1)';
+                    toast.style.opacity = '1';
+                });
+
+                setTimeout(() => {
+                    this.remove(toast);
+                }, duration);
+
+                return toast;
+            }
+
+            createToast(message, type) {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.innerHTML = `
+                    <div class="toast-content">
+                        <span class="toast-message">${message}</span>
+                        <button class="toast-close" onclick="toastManager.remove(this.parentElement.parentElement)">×</button>
+                    </div>
+                `;
+                
+                toast.style.transform = 'translateX(100%) scale(0.8)';
+                toast.style.opacity = '0';
+                
+                return toast;
+            }
+
+            remove(toast) {
+                if (!toast || !toast.parentElement) return;
+                
+                toast.style.transform = 'translateX(100%) scale(0.8)';
+                toast.style.opacity = '0';
+                
+                setTimeout(() => {
+                    if (toast.parentElement) {
+                        toast.remove();
+                    }
+                    this.toasts = this.toasts.filter(t => t !== toast);
+                }, 300);
+            }
+        }
+
+        const toastManager = new ToastManager();
+
+        // Gestion des confirmations de suppression
+        function setupDeleteConfirmations() {
+            const deleteForms = document.querySelectorAll('form[action*="/delete/"]');
+            
+            deleteForms.forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const studentName = this.closest('.student-item').querySelector('.student-name').textContent;
+                    
+                    // Créer une modal de confirmation personnalisée
+                    const modal = document.createElement('div');
+                    modal.className = 'confirmation-modal';
+                    modal.innerHTML = `
+                        <div class="modal-overlay">
+                            <div class="modal-content">
+                                <h3>Confirmer la suppression</h3>
+                                <p>Êtes-vous sûr de vouloir supprimer l'étudiant <strong>${studentName}</strong> ?</p>
+                                <p class="warning-text">Cette action est irréversible.</p>
+                                <div class="modal-actions">
+                                    <button class="btn btn-cancel" onclick="this.closest('.confirmation-modal').remove()">Annuler</button>
+                                    <button class="btn btn-danger" onclick="confirmDelete(this)">Supprimer</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    document.body.appendChild(modal);
+                    
+                    // Animation d'entrée
+                    requestAnimationFrame(() => {
+                        modal.querySelector('.modal-overlay').style.opacity = '1';
+                        modal.querySelector('.modal-content').style.transform = 'scale(1)';
+                    });
+                });
+            });
+        }
+
+        function confirmDelete(button) {
+            const modal = button.closest('.confirmation-modal');
+            const form = modal.querySelector('form') || modal.previousElementSibling;
+            
+            // Animation de sortie
+            modal.querySelector('.modal-overlay').style.opacity = '0';
+            modal.querySelector('.modal-content').style.transform = 'scale(0.8)';
+            
+            setTimeout(() => {
+                modal.remove();
+                if (form) {
+                    form.submit();
+                }
+            }, 200);
+        }
+
+        // Animation des éléments de la liste
+        function animateStudentItems() {
+            const items = document.querySelectorAll('.student-item');
+            items.forEach((item, index) => {
+                item.style.opacity = '0';
+                item.style.transform = 'translateY(20px)';
+                
+                setTimeout(() => {
+                    item.style.transition = 'all 0.5s ease';
+                    item.style.opacity = '1';
+                    item.style.transform = 'translateY(0)';
+                }, index * 100);
+            });
+        }
+
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', function() {
+            setupDeleteConfirmations();
+            animateStudentItems();
+
+            // Afficher le toast s'il y en a un dans l'URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const message = urlParams.get('message');
+            const type = urlParams.get('type');
+            
+            if (message) {
+                toastManager.show(decodeURIComponent(message), type || 'success');
+                
+                // Nettoyer l'URL
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, newUrl);
+            }
+        });

@@ -1,0 +1,165 @@
+doctype html
+html(lang="fr")
+head
+    meta(charset="UTF-8")
+    meta(name="viewport", content="width=device-width, initial-scale=1.0")
+    title Gestion des Étudiants - Accueil
+    link(rel="stylesheet", href="/assets/css/style.css")
+body
+    .container
+        // Navigation
+        nav.nav
+            ul
+                li
+                    a.active(href="/") Home
+                li
+                    a(href="/users") Users
+
+        // Zone de toast
+        #toast-container.toast-container
+
+        // Formulaire d'ajout
+        .form-container
+            h1(style="text-align: center; margin-bottom: 30px; color: #333;") Ajouter un nouvel étudiant
+            
+            form(action="/add-student", method="POST")
+                .form-group
+                    label(for="name") Nom :
+                    input#name(type="text", name="name", required, placeholder="Entrez le nom de l'étudiant")
+                
+                .form-group
+                    label(for="birth") Date de naissance :
+                    input#birth(type="date", name="birth", required)
+                
+                .form-group(style="text-align: center; margin-top: 30px;")
+                    button.btn(type="submit") Ajouter
+
+    script.
+        // Gestionnaire de toasts amélioré
+        class ToastManager {
+            constructor() {
+                this.container = document.getElementById('toast-container');
+                this.toasts = [];
+            }
+
+            show(message, type = 'success', duration = 4000) {
+                const toast = this.createToast(message, type);
+                this.container.appendChild(toast);
+                this.toasts.push(toast);
+
+                // Animation d'entrée
+                requestAnimationFrame(() => {
+                    toast.style.transform = 'translateX(0) scale(1)';
+                    toast.style.opacity = '1';
+                });
+
+                // Auto-suppression
+                setTimeout(() => {
+                    this.remove(toast);
+                }, duration);
+
+                return toast;
+            }
+
+            createToast(message, type) {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.innerHTML = `
+                    <div class="toast-content">
+                        <span class="toast-message">${message}</span>
+                        <button class="toast-close" onclick="toastManager.remove(this.parentElement.parentElement)">×</button>
+                    </div>
+                `;
+                
+                // Styles initiaux pour l'animation
+                toast.style.transform = 'translateX(100%) scale(0.8)';
+                toast.style.opacity = '0';
+                
+                return toast;
+            }
+
+            remove(toast) {
+                if (!toast || !toast.parentElement) return;
+                
+                toast.style.transform = 'translateX(100%) scale(0.8)';
+                toast.style.opacity = '0';
+                
+                setTimeout(() => {
+                    if (toast.parentElement) {
+                        toast.remove();
+                    }
+                    this.toasts = this.toasts.filter(t => t !== toast);
+                }, 300);
+            }
+
+            clear() {
+                this.toasts.forEach(toast => this.remove(toast));
+            }
+        }
+
+        // Instance globale
+        const toastManager = new ToastManager();
+
+        // Fonction de validation en temps réel
+        function setupFormValidation() {
+            const form = document.querySelector('form');
+            const nameInput = document.getElementById('name');
+            const birthInput = document.getElementById('birth');
+            const submitBtn = form.querySelector('button[type="submit"]');
+
+            // Validation du nom
+            nameInput.addEventListener('input', function() {
+                const value = this.value.trim();
+                if (value.length < 2) {
+                    this.setCustomValidity('Le nom doit contenir au moins 2 caractères');
+                } else if (value.length > 50) {
+                    this.setCustomValidity('Le nom ne peut pas dépasser 50 caractères');
+                } else {
+                    this.setCustomValidity('');
+                }
+            });
+
+            // Validation de la date
+            birthInput.addEventListener('change', function() {
+                const selectedDate = new Date(this.value);
+                const today = new Date();
+                
+                if (selectedDate > today) {
+                    this.setCustomValidity('La date de naissance ne peut pas être dans le futur');
+                } else {
+                    this.setCustomValidity('');
+                }
+            });
+
+            // Soumission du formulaire avec loading
+            form.addEventListener('submit', function(e) {
+                if (!form.checkValidity()) {
+                    e.preventDefault();
+                    toastManager.show('Veuillez corriger les erreurs dans le formulaire', 'error');
+                    return;
+                }
+
+                // État de chargement
+                submitBtn.innerHTML = 'Ajout en cours...';
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.7';
+            });
+        }
+
+        // Initialisation
+        document.addEventListener('DOMContentLoaded', function() {
+            setupFormValidation();
+
+            // Afficher le toast s'il y en a un dans l'URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const message = urlParams.get('message');
+            const type = urlParams.get('type');
+            
+            if (message) {
+                toastManager.show(decodeURIComponent(message), type || 'success');
+                
+                // Nettoyer l'URL
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, newUrl);
+            }
+        });
